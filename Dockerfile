@@ -21,7 +21,6 @@ RUN apt-get update -y && apt-get install -y openssl
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=3000
 
 COPY package*.json ./
 RUN npm install
@@ -32,5 +31,6 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/prisma ./prisma
 
 EXPOSE 3000
+EXPOSE 8080
 
-CMD ["sh", "-c", "npx prisma db push && node dist/main.js"]
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss || true; node dist/main.js"]
