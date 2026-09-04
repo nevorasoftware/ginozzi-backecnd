@@ -21,6 +21,7 @@ RUN apt-get update -y && apt-get install -y openssl
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV PORT=3000
 
 COPY package*.json ./
 RUN npm install
