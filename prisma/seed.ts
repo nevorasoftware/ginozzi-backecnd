@@ -6,15 +6,11 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting Ginozzi Database Seeding...');
 
-  // Clean DB
-  await prisma.ventaDetalle.deleteMany();
-  await prisma.venta.deleteMany();
-  await prisma.productoServicio.deleteMany();
-  await prisma.cliente.deleteMany();
-  await prisma.usuario.deleteMany();
-  await prisma.vendedor.deleteMany();
-  await prisma.negocio.deleteMany();
-  await prisma.empresario.deleteMany();
+  const count = await prisma.usuario.count();
+  if (count > 0) {
+    console.log(`🌱 Database already seeded (${count} usuarios existing). Skipping automatic seed.`);
+    return;
+  }
 
   const hashedDefaultPassword = await bcrypt.hash('Admin123!', 10);
   const hashedEmpresarioPassword = await bcrypt.hash('Empresario123!', 10);
