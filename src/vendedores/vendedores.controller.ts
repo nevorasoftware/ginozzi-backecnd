@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { VendedoresService } from './vendedores.service';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 
@@ -14,9 +14,16 @@ export class VendedoresController {
 
   @Get()
   @Roles('SUPER_ADMIN', 'EMPRESARIO', 'VENDEDOR')
-  @ApiOperation({ summary: 'Obtener vendedores (opción filtrar por negocio)' })
-  async findAll(@Query('negocioId') negocioId?: string) {
-    return this.vendedoresService.findAll(negocioId);
+  @ApiOperation({ summary: 'Obtener vendedores (opcionalmente filtrados por negocio, rubro o empresario)' })
+  @ApiQuery({ name: 'negocioId', required: false })
+  @ApiQuery({ name: 'rubroId', required: false })
+  @ApiQuery({ name: 'empresarioId', required: false })
+  async findAll(
+    @Query('negocioId') negocioId?: string,
+    @Query('rubroId') rubroId?: string,
+    @Query('empresarioId') empresarioId?: string,
+  ) {
+    return this.vendedoresService.findAll(negocioId, rubroId, empresarioId);
   }
 
   @Get(':id')

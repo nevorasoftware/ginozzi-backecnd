@@ -1,63 +1,125 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
+export interface DashboardFilterOptions {
+  empresarioIds?: string[];
+  negocioIds?: string[];
+  rubroIds?: string[];
+  vendedorIds?: string[];
+  period?: string; // '1M', '3M', '6M', '12M', 'custom'
+  from?: string;
+  to?: string;
+  groupBy?: string; // 'day', 'week', 'month', 'year'
+}
+
 @Injectable()
 export class DashboardService {
   constructor(private prisma: PrismaService) {}
 
-  async getResumen(userContext?: { role: string; empresarioId?: string; vendedorId?: string; negocioId?: string }) {
-    const totalEmpresarios = await this.prisma.empresario.count();
-    const totalNegocios = await this.prisma.negocio.count();
+  private parseArray(val?: string | string[]): string[] | undefined {
+    if (!val) return undefined;
+    if (Array.isArray(val)) return val;
+    return val.split(',').map((s) => s.trim()).filter(Boolean);
+  }
+
+  private getDateRange(period?: string, fromStr?: string, toStr?: string) {
+    let fromDate: Date | undefined;
+    let toDate: Date | undefined = toStr ? new Date(toStr) : new Date();
+
+    if (fromStr) {
+      fromDate = new Date(fromStr);
+    } else if (period) {
+      const now = new Date();
+      if (period === '1M') {
+        fromDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+      } else if (period === '3M') {
+        fromDate = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+      } else if (period === '6M') {
+        fromDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
+      } else if (period === '12M') {
+        fromDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+      }
+    }
+
+    return { fromDate, toDate };
+  }
+
+  private buildVentaWhere(filters?: DashboardFilterOptions) {
+    const empresarioIds = this.parseArray(filters?.empresarioIds);
+    const negocioIds = this.parseArray(filters?.negocioIds);
+    const rubroIds = this.parseArray(filters?.rubroIds);
+    const vendedorIds = this.parseArray(filters?.vendedorIds);
+    const { fromDate, toDate } = this.getDateRange(filters?.period, filters?.from, filters?.to);
+
+    const where: any = {
+      estado: 'COMPLETADA',
+    };
+
+    if (empresarioIds && empresarioIds.length > 0) {
+      where.empresarioId = { in: empresarioIds };
+    }
+    if (negocioIds && negocioIds.length > 0) {
+      where.negocioId = { in: negocioIds };
+    }
+    if (rubroIds && rubroIds.length > 0) {
+      where.rubroId = { in: rubroIds };
+    }
+    if (vendedorIds && vendedorIds.length > 0) {
+      where.vendedorId = { in: vendedorIds };
+    }
+    if (fromDate || toDate) {
+      where.fechaVenta = {
+        ...(fromDate && { gte: fromDate }),
+        ...(toDate && { lte: toDate }),
+      };
+    }
+
+    return where;
+  }
+
+  async getResumen(filters?: DashboardFilterOptions) {
+    const totalEmpresarios = await this.prisma.empresario.count({ where: { estado: 'ACTIVO' } });
+    const totalNegocios = await this.prisma.negocio.count({ where: { estado: 'ACTIVO' } });
+    const totalRubros = await this.prisma.rubro.count({ where: { estado: 'ACTIVO' } });
     const totalVendedores = await this.prisma.vendedor.count();
     const vendedoresActivos = await this.prisma.vendedor.count({ where: { estado: 'ACTIVO' } });
-    const totalClientes = await this.prisma.cliente.count();
+    const totalClientes = await this.prisma.cliente.count({ where: { estado: 'ACTIVO' } });
 
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const ventaWhere = this.buildVentaWhere(filters);
 
     const ventasTotal = await this.prisma.venta.aggregate({
-      where: { estado: 'COMPLETADA' },
-      _sum: { total: true, montoGanancia: true },
+      where: ventaWhere,
+      _sum: { total: true, montoGanancia: true, subtotal: true, descuento: true },
       _count: true,
     });
 
-    const ventasMes = await this.prisma.venta.aggregate({
-      where: {
-        estado: 'COMPLETADA',
-        fechaVenta: { gte: startOfMonth },
-      },
-      _sum: { total: true, montoGanancia: true },
-      _count: true,
-    });
+    const totalVentas = ventasTotal._sum.total || 0;
+    const countVentas = ventasTotal._count || 0;
+    const promedioTicket = countVentas > 0 ? Number((totalVentas / countVentas).toFixed(2)) : 0;
 
     return {
       kpis: {
         totalEmpresarios,
         totalNegocios,
+        totalRubros,
         totalVendedores,
         vendedoresActivos,
         totalClientes,
-        ventasMesCount: ventasMes._count || 0,
-        ventasMesTotal: ventasMes._sum.total || 0,
-        gananciasMesTotal: ventasMes._sum.montoGanancia || 0,
-        ventasAcumuladasTotal: ventasTotal._sum.total || 0,
+        ventasMesCount: countVentas,
+        ventasMesTotal: totalVentas,
+        gananciasMesTotal: ventasTotal._sum.montoGanancia || 0,
+        ventasAcumuladasTotal: totalVentas,
         gananciasAcumuladasTotal: ventasTotal._sum.montoGanancia || 0,
+        promedioTicket,
       },
     };
   }
 
-  async getVentasPeriodo(from?: string, to?: string, groupBy: string = 'month') {
-    const fromDate = from ? new Date(from) : new Date(new Date().setFullYear(new Date().getFullYear() - 1));
-    const toDate = to ? new Date(to) : new Date();
+  async getVentasPeriodo(filters?: DashboardFilterOptions) {
+    const ventaWhere = this.buildVentaWhere(filters);
 
     const ventas = await this.prisma.venta.findMany({
-      where: {
-        estado: 'COMPLETADA',
-        fechaVenta: {
-          gte: fromDate,
-          lte: toDate,
-        },
-      },
+      where: ventaWhere,
       select: {
         fechaVenta: true,
         total: true,
@@ -66,9 +128,8 @@ export class DashboardService {
       orderBy: { fechaVenta: 'asc' },
     });
 
-    // Grouping by key (Month name / date label)
+    const groupBy = filters?.groupBy || 'month';
     const aggregated: Record<string, { periodo: string; totalVentas: number; ganancias: number; cantidad: number }> = {};
-
     const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
     ventas.forEach((v) => {
@@ -83,7 +144,6 @@ export class DashboardService {
       } else if (groupBy === 'year') {
         key = `${dateObj.getFullYear()}`;
       } else {
-        // month
         key = `${monthNames[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
       }
 
@@ -103,26 +163,23 @@ export class DashboardService {
     }));
   }
 
-  async getTopVendedores(limit: number = 5, from?: string, to?: string) {
-    const fromDate = from ? new Date(from) : undefined;
-    const toDate = to ? new Date(to) : undefined;
+  async getTopVendedores(limit: number = 5, filters?: DashboardFilterOptions) {
+    const negocioIds = this.parseArray(filters?.negocioIds);
+    const rubroIds = this.parseArray(filters?.rubroIds);
+    const vendedorIds = this.parseArray(filters?.vendedorIds);
 
     const vendedores = await this.prisma.vendedor.findMany({
-      where: { estado: 'ACTIVO' },
+      where: {
+        estado: 'ACTIVO',
+        ...(negocioIds && negocioIds.length > 0 && { negocioId: { in: negocioIds } }),
+        ...(rubroIds && rubroIds.length > 0 && { rubroId: { in: rubroIds } }),
+        ...(vendedorIds && vendedorIds.length > 0 && { id: { in: vendedorIds } }),
+      },
       include: {
         negocio: true,
+        rubro: true,
         ventas: {
-          where: {
-            estado: 'COMPLETADA',
-            ...(fromDate || toDate
-              ? {
-                  fechaVenta: {
-                    ...(fromDate && { gte: fromDate }),
-                    ...(toDate && { lte: toDate }),
-                  },
-                }
-              : {}),
-          },
+          where: this.buildVentaWhere(filters),
         },
         _count: { select: { clientes: true } },
       },
@@ -135,7 +192,7 @@ export class DashboardService {
         id: v.id,
         nombre: `${v.nombre} ${v.apellido}`,
         negocio: v.negocio.nombre,
-        rubro: v.negocio.rubro,
+        rubro: v.rubro?.nombre || v.negocio.rubro || 'General',
         totalVendido: Number(totalVendido.toFixed(2)),
         totalGanancias: Number(totalGanancias.toFixed(2)),
         cantidadVentas: v.ventas.length,
@@ -147,32 +204,7 @@ export class DashboardService {
     return ranked.slice(0, Number(limit));
   }
 
-  async getRendimientoVendedores(negocioId?: string, vendedorId?: string) {
-    const vendedores = await this.prisma.vendedor.findMany({
-      where: {
-        ...(negocioId && { negocioId }),
-        ...(vendedorId && { id: vendedorId }),
-      },
-      include: {
-        negocio: true,
-        ventas: { where: { estado: 'COMPLETADA' } },
-        clientes: true,
-      },
-    });
-
-    return vendedores.map((v) => {
-      const totalVendido = v.ventas.reduce((sum, item) => sum + item.total, 0);
-      const totalGanancias = v.ventas.reduce((sum, item) => sum + item.montoGanancia, 0);
-      return {
-        id: v.id,
-        nombreCompleto: `${v.nombre} ${v.apellido}`,
-        negocio: v.negocio.nombre,
-        totalVendido: Number(totalVendido.toFixed(2)),
-        totalGanancias: Number(totalGanancias.toFixed(2)),
-        cantidadVentas: v.ventas.length,
-        cantidadClientes: v.clientes.length,
-        promedioTicket: v.ventas.length > 0 ? Number((totalVendido / v.ventas.length).toFixed(2)) : 0,
-      };
-    });
+  async getRendimientoVendedores(filters?: DashboardFilterOptions) {
+    return this.getTopVendedores(100, filters);
   }
 }

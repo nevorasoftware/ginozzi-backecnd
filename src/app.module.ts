@@ -4,6 +4,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { EmpresariosModule } from './empresarios/empresarios.module';
 import { NegociosModule } from './negocios/negocios.module';
+import { RubrosModule } from './rubros/rubros.module';
 import { VendedoresModule } from './vendedores/vendedores.module';
 import { ClientesModule } from './clientes/clientes.module';
 import { ProductosServiciosModule } from './productos-servicios/productos-servicios.module';
@@ -19,6 +20,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     AuthModule,
     EmpresariosModule,
     NegociosModule,
+    RubrosModule,
     VendedoresModule,
     ClientesModule,
     ProductosServiciosModule,
