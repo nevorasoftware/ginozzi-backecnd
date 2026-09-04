@@ -4,6 +4,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { PrismaService } from './prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
+import * as http from 'http';
 
 async function seedInitialDataIfNeeded(app: any) {
   try {
@@ -28,7 +29,7 @@ async function seedInitialDataIfNeeded(app: any) {
         },
       }).catch(err => console.error('Admin create err:', err.message));
 
-      // 2. Empresarios
+      // 2. Empresario
       const emp1 = await prisma.empresario.create({
         data: {
           id: 'emp-01',
@@ -158,9 +159,9 @@ async function seedInitialDataIfNeeded(app: any) {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Enable CORS
+  // Enable CORS for all origins and headers
   app.enableCors({
-    origin: '*',
+    origin: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
@@ -191,9 +192,28 @@ async function bootstrap() {
   SwaggerModule.setup('docs', app, document);
   SwaggerModule.setup('api/docs', app, document);
 
-  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
-  await app.listen(port, '0.0.0.0');
-  console.log(`🚀 GINOZZI Backend running on port: ${port}`);
+  const expressApp = app.getHttpAdapter().getInstance();
+  const primaryPort = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+
+  // Listen on primary port
+  await app.listen(primaryPort, '0.0.0.0');
+  console.log(`🚀 GINOZZI Backend listening on primary port: ${primaryPort}`);
+
+  // Create secondary HTTP listeners for fallback ports (8080 and 3000) if primary is different
+  const fallbackPorts = [8080, 3000].filter((p) => p !== primaryPort);
+  for (const fPort of fallbackPorts) {
+    try {
+      const server = http.createServer(expressApp);
+      server.listen(fPort, '0.0.0.0', () => {
+        console.log(`🚀 GINOZZI Backend secondary listener active on port: ${fPort}`);
+      });
+      server.on('error', () => {
+        // Port already in use, safe to ignore
+      });
+    } catch (e) {
+      // Ignore
+    }
+  }
 
   // Run seed check in background after server is up
   setTimeout(() => seedInitialDataIfNeeded(app), 1000);
