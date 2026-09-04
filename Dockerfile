@@ -33,4 +33,4 @@ COPY --from=builder /app/prisma ./prisma
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma db push && npx ts-node prisma/seed.ts && node dist/main.js"]
+CMD ["sh", "-c", "npx prisma db push && node dist/main.js"]
