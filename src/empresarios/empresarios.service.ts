@@ -105,4 +105,14 @@ export class EmpresariosService {
     });
     return updated;
   }
+
+  async remove(id: string) {
+    await this.findOne(id);
+    await this.prisma.usuario.deleteMany({
+      where: { empresarioId: id },
+    });
+    return this.prisma.empresario.delete({
+      where: { id },
+    });
+  }
 }

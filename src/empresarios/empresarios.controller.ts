@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { EmpresariosService } from './empresarios.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -45,5 +45,12 @@ export class EmpresariosController {
   @ApiOperation({ summary: 'Cambiar estado del empresario' })
   async updateStatus(@Param('id') id: string, @Body('estado') estado: 'ACTIVO' | 'INACTIVO') {
     return this.empresariosService.updateStatus(id, estado);
+  }
+
+  @Delete(':id')
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'Eliminar empresario' })
+  async remove(@Param('id') id: string) {
+    return this.empresariosService.remove(id);
   }
 }
