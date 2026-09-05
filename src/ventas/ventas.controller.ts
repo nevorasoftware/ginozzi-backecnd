@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { VentasService } from './ventas.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -50,5 +50,12 @@ export class VentasController {
   @ApiOperation({ summary: 'Anular venta registrada' })
   async anular(@Param('id') id: string) {
     return this.ventasService.anular(id);
+  }
+
+  @Delete(':id')
+  @Roles('SUPER_ADMIN', 'EMPRESARIO')
+  @ApiOperation({ summary: 'Eliminar venta' })
+  async remove(@Param('id') id: string) {
+    return this.ventasService.remove(id);
   }
 }

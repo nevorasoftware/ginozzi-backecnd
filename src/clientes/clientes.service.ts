@@ -80,4 +80,11 @@ export class ClientesService {
       data: { estado },
     });
   }
+
+  async remove(id: string) {
+    await this.findOne(id);
+    return this.prisma.cliente.delete({
+      where: { id },
+    });
+  }
 }

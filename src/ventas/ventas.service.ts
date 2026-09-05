@@ -149,4 +149,11 @@ export class VentasService {
       include: { negocio: true, vendedor: true, cliente: true },
     });
   }
+
+  async remove(id: string) {
+    await this.findOne(id);
+    return this.prisma.venta.delete({
+      where: { id },
+    });
+  }
 }

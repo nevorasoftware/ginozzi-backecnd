@@ -203,4 +203,14 @@ export class VendedoresService {
       orderBy: { createdAt: 'desc' },
     });
   }
+
+  async remove(id: string) {
+    await this.findOne(id);
+    await this.prisma.usuario.deleteMany({
+      where: { vendedorId: id },
+    });
+    return this.prisma.vendedor.delete({
+      where: { id },
+    });
+  }
 }

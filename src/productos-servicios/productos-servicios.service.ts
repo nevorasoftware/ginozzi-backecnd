@@ -62,4 +62,11 @@ export class ProductosServiciosService {
       data: { estado },
     });
   }
+
+  async remove(id: string) {
+    await this.findOne(id);
+    return this.prisma.productoServicio.delete({
+      where: { id },
+    });
+  }
 }

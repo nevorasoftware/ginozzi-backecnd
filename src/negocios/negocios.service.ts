@@ -70,4 +70,11 @@ export class NegociosService {
       data: { estado },
     });
   }
+
+  async remove(id: string) {
+    await this.findOne(id);
+    return this.prisma.negocio.delete({
+      where: { id },
+    });
+  }
 }

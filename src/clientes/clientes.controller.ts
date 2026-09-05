@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ClientesService } from './clientes.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -45,5 +45,12 @@ export class ClientesController {
   @ApiOperation({ summary: 'Cambiar estado del cliente' })
   async updateStatus(@Param('id') id: string, @Body('estado') estado: 'ACTIVO' | 'INACTIVO') {
     return this.clientesService.updateStatus(id, estado);
+  }
+
+  @Delete(':id')
+  @Roles('SUPER_ADMIN', 'EMPRESARIO', 'VENDEDOR')
+  @ApiOperation({ summary: 'Eliminar cliente' })
+  async remove(@Param('id') id: string) {
+    return this.clientesService.remove(id);
   }
 }
